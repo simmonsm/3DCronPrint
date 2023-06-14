@@ -10,7 +10,7 @@
 # define custom variables
 email="" # set to your email address of leave to ignore emailing start/stop of print job. Needs mailx installed.
 slicepath="/usr/bin/slic3r"
-printcorepath="$HOME/store/3D/BatchPrinting/Printrun/printcore.py"
+printcorepath="$HOME/store/3D/Printrun/printcore.py"
 filamentini="$HOME/.Slic3r/filament/MarksPLA.ini"
 printcorefolder=`dirname $printcorepath`
 linefile=$printcorefolder/line.gcode # location of the gcode to draw out a starting line of filament 
