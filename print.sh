@@ -17,11 +17,13 @@ linefile=line.gcode # location of the gcode to draw out a starting line of filam
 shutdownfile=shutdown.gcode # the code to cool-down after a job
 baud=115200 #serial speed for your 3D printer
 mx=$(which mailx)
+
+# look for creality ender 5 pro on usb port by vendor
+serialvendorstring="1a86:7523" # change to your printers equivalent
 #
 if [ $scan ]
 then
- # look for creality ender 5 pro on usb port by vendor
- bus=`lsusb -d 1a86:7523 | awk -F' ' '{print $2}'`
+ bus=`lsusb -d $serialvendorstring | awk -F' ' '{print $2}'`
  echo "bus=$bus"
  if [ ! $bus ]
  then
