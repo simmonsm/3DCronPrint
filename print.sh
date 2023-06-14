@@ -13,10 +13,10 @@ slicepath="/usr/bin/slic3r"
 printcorepath="$HOME/store/3D/Printrun/printcore.py"
 filamentini="$HOME/.Slic3r/filament/MarksPLA.ini"
 printcorefolder=`dirname $printcorepath`
-linefile=$printcorefolder/line.gcode # location of the gcode to draw out a starting line of filament 
-shutdownfile=$printcorefolder/shutdown.gcode # the code to cool-down after a job
+linefile=line.gcode # location of the gcode to draw out a starting line of filament 
+shutdownfile=shutdown.gcode # the code to cool-down after a job
 baud=115200 #serial speed for your 3D printer
-
+mx=$(which mailx)
 #
 if [ $scan ]
 then
@@ -96,9 +96,12 @@ then
 	gcodefile=$1
 fi
 
-if [ $email != "" && `which mailx` ]
+if [ "$mx" != "" ]
 then
-    echo "start of printing of $gcodefile" | mailx -s "3D Printing" $email
+	if [ "$email" != "" ]
+	then
+    		echo "start of printing of $gcodefile" | $mx -s "3D Printing" $email
+	fi
 fi
 
 echo "printing run line code..."
@@ -110,10 +113,14 @@ $printcorepath --baud=$baud $devfile "$gcodefile"
 echo "printing shutdown.gcode .."
 $printcorepath --baud=$baud $devfile "$shutdownfile"
 
-if [ $email != "" && `which mailx`]
+if [ "$mx" != "" ]
 then
-    echo "end of printing of $gcodefile" | mailx -s "3D Printing" $email
+	if [ $email != "" ]
+	then
+    		echo "end of printing of $gcodefile" | $mx -s "3D Printing" $email
+	fi
 fi
+
 echo "done"
 # && pm-suspend &
 #echo $! > $HOME/printrunpid.file
