@@ -19,7 +19,10 @@ resetfile=reset.gcode # code to reset printer
 baud=115200 #serial speed for your 3D printer
 mx=$(which mailx)
 
-# look for creality ender 5 pro on usb port by vendor
+# look for creality ender 5 pro on usb port by vendor 
+# can use lsusb to find the vendor id and device id
+# see also https://www.linux-usb.org/usb.ids for list
+# for this case 1a86:7523 is the QinHeng Electronics CH340 serial converter
 serialvendorstring="1a86:7523" # TODO: change to your printers equivalent!
 #
 if [ $scan ]
