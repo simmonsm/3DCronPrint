@@ -15,11 +15,12 @@ filamentini="$HOME/.Slic3r/filament/MarksPLA.ini"
 printcorefolder=`dirname $printcorepath`
 linefile=line.gcode # location of the gcode to draw out a starting line of filament 
 shutdownfile=shutdown.gcode # the code to cool-down after a job
+resetfile=reset.gcode # code to reset printer
 baud=115200 #serial speed for your 3D printer
 mx=$(which mailx)
 
 # look for creality ender 5 pro on usb port by vendor
-serialvendorstring="1a86:7523" # change to your printers equivalent
+serialvendorstring="1a86:7523" # TODO: change to your printers equivalent!
 #
 if [ $scan ]
 then
@@ -105,6 +106,16 @@ then
     		echo "start of printing of $gcodefile" | $mx -s "3D Printing" $email
 	fi
 fi
+
+trap ctrl_c INT
+
+function ctrl_c() {
+        echo "** Trapped CTRL-C"
+	echo "attempting printer reset..."
+	$printcorepath --baud=$baud $devfile "$resetfile"
+	echo "exiting"
+	exit
+}
 
 echo "printing run line code..."
 $printcorepath --baud=$baud $devfile "$linefile"
