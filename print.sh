@@ -8,14 +8,22 @@
 #   mailx for Linux from mail-util / bsd-mailx via apt install command
 #
 # define custom variables
-email="" # set to your email address of leave to ignore emailing start/stop of print job. Needs mailx installed.
+email="mark@ludshottcomputing.com" # set to your email address of leave to ignore emailing start/stop of print job. Needs mailx installed.
 slicepath="/usr/bin/slic3r"
 printcorepath="$HOME/store/3D/Printrun/printcore.py"
 filamentini="$HOME/.Slic3r/filament/MarksPLA.ini"
 printcorefolder=`dirname $printcorepath`
-linefile=line.gcode # location of the gcode to draw out a starting line of filament 
-shutdownfile=shutdown.gcode # the code to cool-down after a job
-resetfile=reset.gcode # code to reset printer
+lockfile="$printcorefolder/print_bed_occupied.tmp"
+SOURCE=${BASH_SOURCE[0]}
+while [ -L "$SOURCE" ]; do # resolve $SOURCE until the file is no longer a symlink
+  DIR=$( cd -P "$( dirname "$SOURCE" )" >/dev/null 2>&1 && pwd )
+  SOURCE=$(readlink "$SOURCE")
+  [[ $SOURCE != /* ]] && SOURCE=$DIR/$SOURCE # if $SOURCE was a relative symlink, we need to resolve it relative to the path where the symlink file was located
+done
+scriptfolder=$( cd -P "$( dirname "$SOURCE" )" >/dev/null 2>&1 && pwd )
+echo "$scriptfolder"
+shutdownfile="$scriptfolder/shutdown.gcode" # the code to cool-down after a job
+resetfile="$scriptfolder/reset.gcode" # code to reset printer
 baud=115200 #serial speed for your 3D printer
 mx=$(which mailx)
 
@@ -24,6 +32,26 @@ mx=$(which mailx)
 # see also https://www.linux-usb.org/usb.ids for list
 # for this case 1a86:7523 is the QinHeng Electronics CH340 serial converter
 serialvendorstring="1a86:7523" # TODO: change to your printers equivalent!
+
+stlfile="" # pass in stlfile as 1st arg
+devfile="" # can pass in /dev/ttyUSB0 as 2nd arg
+if [ $# -eq 0 ]
+then
+  echo "usage: $0 stlfile|gcodefile [devicefile]"
+  exit 1
+fi
+
+if [ $# -gt 0 ]
+then
+	stlfile=$1
+fi
+echo "stlfile=$stlfile"
+if [ $# -gt 1 ]
+then
+	devfile=$2
+fi
+echo "devfile=$devfile"
+
 #
 if [ $scan ]
 then
@@ -40,15 +68,19 @@ then
  devfile="/dev/ttyUSB$n"
 
 else
-	devfile="/dev/ttyUSB0"
+	if [ "$devfile" = "" ] # so not given as a param
+	then
+		devfile="/dev/ttyUSB0"
+	fi
 fi
 
 
 if [ ! -e "$devfile" ]
 then
-	echo "missing $devfile. Check printer is powered and connected."
+	echo "missing device: $devfile. Check printer is powered and connected."
 	exit 0
 fi
+echo "using device: $devfile"
 
 if [ ! -f "$printcorepath" ]
 then
@@ -56,23 +88,15 @@ then
 	exit 0
 fi
 
-if [ ! -e "$linefile" ]
-then
-	echo "missing line.gcode"
-	exit 0
-else
-	echo "found line.gcode"
-fi
 
 if [ ! -e "$shutdownfile" ]
 then
-	echo "missing shutdown.gcode"
+	echo "missing $shutdownfile"
 	exit 0
 else	
-	echo "found shutdown.gcode"
+	echo "found $shutdownfile"
 fi
 
-stlfile=$1
 if [ ! -f "$stlfile" ]
 then
 	echo "missing file: $stlfile"
@@ -81,8 +105,10 @@ else
 	echo "found $stlfile"
 fi
 
-base="${stlfile%%.*}"
-ext="${stlfile#*.}"
+base="${stlfile%.*}"
+echo "base=$base"
+ext="${stlfile##*.}"
+echo "ext=$ext"
 if [ "$ext" == "stl" ]
 then
 	echo "stl file supplied."
@@ -115,23 +141,43 @@ trap ctrl_c INT
 function ctrl_c() {
         echo "** Trapped CTRL-C"
 	echo "attempting printer reset..."
-	$printcorepath --baud=$baud $devfile "$resetfile"
+	$printcorepath -s --baud=$baud $devfile "$resetfile"
+	
+	if [ "$email" != "" ]
+	then
+		echo "interupted printing of $gcodefile" | $mx -s "3D Printing" $email
+	fi
+
 	echo "exiting"
 	exit
 }
 
-echo "printing run line code..."
-$printcorepath --baud=$baud $devfile "$linefile"
+# ensure we don't attempt to print again whilst a model is on the bed
+if [ -f $lockfile ] 
+then
+	echo "A lockfile $lockfile was found. If bed is clear remove that file. Aborting"
+	exit
+fi
+
+touch $lockfile
+
+# the cura produced gcode contains line drawing but needed if we slice stl
+# with slic3r
+if [ $ext == "stl" ]
+then
+	echo "printing run line code..."
+	$printcorepath -s --baud=$baud $devfile "$linefile"
+fi
 
 echo "printing $gcodefile .."
-$printcorepath --baud=$baud $devfile "$gcodefile"
+$printcorepath -s --baud=$baud $devfile "$gcodefile"
 
 echo "printing shutdown.gcode .."
-$printcorepath --baud=$baud $devfile "$shutdownfile"
+$printcorepath -s --baud=$baud $devfile "$shutdownfile"
 
 if [ "$mx" != "" ]
 then
-	if [ $email != "" ]
+	if [ "$email" != "" ]
 	then
     		echo "end of printing of $gcodefile" | $mx -s "3D Printing" $email
 	fi
